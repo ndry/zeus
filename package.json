@@ -1,0 +1,14 @@
+{
+  "private": true,
+  "scripts": {
+    "cbuild": "tsc",
+    "start": "http-server . -p 45822 -o http://127.0.0.1:45822/public/ -c-1"
+  },
+  "devDependencies": {
+    "http-server": "^0.10.0"
+  },
+  "dependencies": {
+    "gpu.js": "^1.2.0",
+    "simplex-noise": "^2.4.0"
+  }
+}

@@ -1,0 +1,32 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<meta charset="utf-8" />
+<title>zeus</title>
+<link rel="icon" href="./favicon.ico">
+<link rel="stylesheet" type="text/css" href="style.css">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/systemjs/0.20.19/system.js"></script>
+<script src="./system.config.js"></script>
+<script src="./app.js"></script>
+<script>
+    window.addEventListener('load', function(e) {
+        System
+            .import('main')
+            .then(null, console.error.bind(console));
+    });
+</script>
+<style>
+
+</style>
+
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    <div id="statistics">
+        <div id="fps-label"></div>
+        <div id="frame-list"></div>
+    </div>
+</body>
+</html>
