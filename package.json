@@ -8,6 +8,7 @@
     "http-server": "^0.10.0"
   },
   "dependencies": {
+    "gif.js": "^0.2.0",
     "gpu.js": "^1.2.0",
     "simplex-noise": "^2.4.0"
   }

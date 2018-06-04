@@ -66,7 +66,7 @@ System.register("BackgroundResistanceMap", ["simplex-noise", "utils/Random"], fu
                         const valueScale = Math.pow(2, (this.simplicis.length - i - 1) * this.frequencyFactor);
                         v += simplex.noise3D(x * gridScale, y * gridScale, t * gridScale) / valueScale;
                     }
-                    return v;
+                    return 1; //v;
                 }
             };
             BackgroundResistanceMap = class BackgroundResistanceMap {
@@ -75,21 +75,20 @@ System.register("BackgroundResistanceMap", ["simplex-noise", "utils/Random"], fu
                     this.height = height;
                     this.dynamicNoiseScale = 1 / 4;
                     this.random = new Random_1.Random(0);
-                    this.size = width * height;
+                    this.area = width * height;
                     this.noise = new Noise();
-                    this.originalMap = new Float64Array(this.size);
+                    this.originalMap = Array.from({ length: height }, () => new Float64Array(width));
                     this.fillMap(0);
-                    this.map = new Float64Array(this.size);
-                    this.normMap = new Float64Array(this.size);
+                    this.map = Array.from({ length: height }, () => new Float64Array(width));
+                    this.normMap = Array.from({ length: height }, () => new Float64Array(width));
                 }
                 fillMap(t) {
                     let min = Number.POSITIVE_INFINITY;
                     let max = Number.NEGATIVE_INFINITY;
                     for (let y = 0; y < this.height; y++) {
-                        const oy = y * this.width;
+                        const originalMapY = this.originalMap[y];
                         for (let x = 0; x < this.width; x++) {
-                            const i = oy + x;
-                            const v = this.originalMap[i] = this.noise.getValue(x, y, t);
+                            const v = originalMapY[x] = this.noise.getValue(x, y, t);
                             if (v > max) {
                                 max = v;
                             }
@@ -106,11 +105,12 @@ System.register("BackgroundResistanceMap", ["simplex-noise", "utils/Random"], fu
                 update(t) {
                     const range = this.originalMapRange.max + this.dynamicNoiseScale - this.originalMapRange.min;
                     for (let y = 0; y < this.height; y++) {
-                        const oy = y * this.width;
+                        const originalMapY = this.originalMap[y];
+                        const mapY = this.map[y];
+                        const normMapY = this.normMap[y];
                         for (let x = 0; x < this.width; x++) {
-                            const i = oy + x;
-                            const mapV = this.map[i] = this.originalMap[i] + this.random.nextFloat() * this.dynamicNoiseScale;
-                            this.normMap[i] = (mapV - this.originalMapRange.min) / range;
+                            const mapV = mapY[x] = originalMapY[x] + this.random.nextFloat() * this.dynamicNoiseScale;
+                            normMapY[x] = 0.2 + (mapV - this.originalMapRange.min) / range * .8;
                         }
                     }
                 }
@@ -128,20 +128,22 @@ System.register("generateVoltageMap", [], function (exports_3, context_3) {
             r: (height - 150),
             factor: 1 / 3,
         };
-        const map = new Float64Array(width * height);
+        const map = Array.from({ length: height }, () => new Float64Array(width));
         let min = Number.POSITIVE_INFINITY;
         let max = Number.NEGATIVE_INFINITY;
         for (let y = 0; y < height; y++) {
-            const oy = y * width;
+            const mapY = map[y];
             for (let x = 0; x < width; x++) {
-                const i = oy + x;
                 let v = 0;
-                v += (y / height) * (y / height) * (y / height) * (y / height) * (y / height);
-                const dx = x - sourceRadialGradientArgs.cx;
-                const dy = y - sourceRadialGradientArgs.cy;
-                const d = Math.sqrt(dx * dx + dy * dy);
-                v -= (1 - Math.pow(d / sourceRadialGradientArgs.r, 2)) * sourceRadialGradientArgs.factor;
-                map[i] = v;
+                // v += (y / height);
+                {
+                    const args = sourceRadialGradientArgs;
+                    const dx = x - args.cx;
+                    const dy = y - args.cy;
+                    const r = Math.max(Math.sqrt(dx * dx + dy * dy), 1) / args.r;
+                    v -= (1 / r) * args.factor;
+                }
+                mapY[x] = v;
                 if (v > max) {
                     max = v;
                 }
@@ -152,10 +154,9 @@ System.register("generateVoltageMap", [], function (exports_3, context_3) {
         }
         const range = max - min;
         for (let y = 0; y < height; y++) {
-            const oy = y * width;
+            const mapY = map[y];
             for (let x = 0; x < width; x++) {
-                const i = oy + x;
-                map[i] = (map[i] - min) / range;
+                mapY[x] = (mapY[x] - min) / range;
             }
         }
         return map;
@@ -714,9 +715,9 @@ void main(void) {
         }
     };
 });
-System.register("World", ["BackgroundResistanceMap", "generateVoltageMap", "paths"], function (exports_6, context_6) {
+System.register("World", ["BackgroundResistanceMap", "generateVoltageMap"], function (exports_6, context_6) {
     var __moduleName = context_6 && context_6.id;
-    var BackgroundResistanceMap_1, generateVoltageMap_1, paths_1, World;
+    var BackgroundResistanceMap_1, generateVoltageMap_1, World;
     return {
         setters: [
             function (BackgroundResistanceMap_1_1) {
@@ -724,28 +725,141 @@ System.register("World", ["BackgroundResistanceMap", "generateVoltageMap", "path
             },
             function (generateVoltageMap_1_1) {
                 generateVoltageMap_1 = generateVoltageMap_1_1;
-            },
-            function (paths_1_1) {
-                paths_1 = paths_1_1;
             }
         ],
         execute: function () {
             World = class World {
-                constructor(width, height) {
+                constructor(width, height, start) {
                     this.width = width;
                     this.height = height;
+                    this.start = start;
+                    // floodPaths: {
+                    //     sumMap: Float64Array,
+                    //     precessorMap: Int32Array,
+                    // };
+                    // travelPaths: Float64Array;
                     this.t = -Infinity;
                     this.resistanceResource = 60;
                     this.area = width * height;
                     this.backgroundResistanceMap = new BackgroundResistanceMap_1.BackgroundResistanceMap(width, height);
                     this.voltageMap = generateVoltageMap_1.generateVoltageMap(width, height);
-                    // const ionizedResistaceMap = map(backgroundResistanceMap, () => 1);
+                    this.floodMap = Array.from({ length: height }, () => {
+                        const arr = new Float64Array(width);
+                        arr.fill(Infinity);
+                        return arr;
+                    });
+                    this.nextFloodMap = Array.from({ length: height }, () => {
+                        const arr = new Float64Array(width);
+                        arr.fill(Infinity);
+                        return arr;
+                    });
+                    this.floodMap[this.start.y][this.start.x] = 0;
+                }
+                updateFloodMap() {
+                    const width = this.width;
+                    const height = this.height;
+                    const dnn = Math.SQRT2;
+                    const dnz = 1;
+                    const dnp = Math.SQRT2;
+                    const dzn = 1;
+                    const dzz = 0;
+                    const dzp = 1;
+                    const dpn = Math.SQRT2;
+                    const dpz = 1;
+                    const dpp = Math.SQRT2;
+                    let en;
+                    let ez = this.floodMap[0];
+                    let ep = this.floodMap[1];
+                    for (let ey = 1; ey < this.floodMap.length - 1; ey++) {
+                        en = ez;
+                        ez = ep;
+                        ep = this.floodMap[ey + 1];
+                        let enn;
+                        let enz = en[0];
+                        let enp = en[1];
+                        let ezn;
+                        let ezz = ez[0];
+                        let ezp = ez[1];
+                        let epn;
+                        let epz = ep[0];
+                        let epp = ep[1];
+                        const rz = this.backgroundResistanceMap.normMap[ey];
+                        const nez = this.nextFloodMap[ey];
+                        for (let ex = 1; ex < ez.length - 1; ex++) {
+                            enn = enz;
+                            enz = enp;
+                            enp = en[ex + 1];
+                            ezn = ezz;
+                            ezz = ezp;
+                            ezp = ez[ex + 1];
+                            epn = epz;
+                            epz = epp;
+                            epp = ep[ex + 1];
+                            const rzz = rz[ex];
+                            let minSum = ezz * 1.005;
+                            {
+                                const sum = enn + dnn * rzz;
+                                if (sum < minSum) {
+                                    minSum = sum;
+                                }
+                            }
+                            {
+                                const sum = enz + dnz * rzz;
+                                if (sum < minSum) {
+                                    minSum = sum;
+                                }
+                            }
+                            {
+                                const sum = enp + dnp * rzz;
+                                if (sum < minSum) {
+                                    minSum = sum;
+                                }
+                            }
+                            {
+                                const sum = ezn + dzn * rzz;
+                                if (sum < minSum) {
+                                    minSum = sum;
+                                }
+                            }
+                            {
+                                const sum = ezp + dzp * rzz;
+                                if (sum < minSum) {
+                                    minSum = sum;
+                                }
+                            }
+                            {
+                                const sum = epn + dpn * rzz;
+                                if (sum < minSum) {
+                                    minSum = sum;
+                                }
+                            }
+                            {
+                                const sum = epz + dpz * rzz;
+                                if (sum < minSum) {
+                                    minSum = sum;
+                                }
+                            }
+                            {
+                                const sum = epp + dpp * rzz;
+                                if (sum < minSum) {
+                                    minSum = sum;
+                                }
+                            }
+                            nez[ex] = minSum;
+                        }
+                    }
+                    const tmp = this.floodMap;
+                    this.floodMap = this.nextFloodMap;
+                    this.nextFloodMap = tmp;
                 }
                 update() {
                     this.t = (this.t < 0) ? 0 : (this.t + 1);
                     this.backgroundResistanceMap.update(this.t);
-                    this.floodPaths = paths_1.floodPaths(this.backgroundResistanceMap.normMap, this.width, this.height, 150, 150, this.resistanceResource);
-                    this.travelPaths = paths_1.travelPaths(this.floodPaths, this.voltageMap, this.width, this.height, 150, 150, this.resistanceResource);
+                    this.updateFloodMap();
+                    // this.floodPaths = floodPaths(this.backgroundResistanceMap.normMap,
+                    //     this.width, this.height, 150, 150, this.resistanceResource);
+                    // this.travelPaths = travelPaths(this.floodPaths, this.voltageMap,
+                    //     this.width, this.height, 150, 150, this.resistanceResource);
                 }
             };
             exports_6("World", World);
@@ -814,27 +928,33 @@ System.register("Renderer", ["utils/imageData"], function (exports_8, context_8)
                     const fps = 1000 / (now - this.lastIteration);
                     this.lastIteration = now;
                     this.fpsLabel.innerText = `fps: ${fps.toFixed(2)}`;
-                    for (let i = 0; i < this.world.area; i++) {
-                        const tpi = this.world.travelPaths[i];
-                        const rtpi = 1 - tpi;
-                        const drawTpi = 1 - rtpi * rtpi * rtpi * rtpi;
-                        const fpsi = this.world.floodPaths.sumMap[i];
-                        const stop = fpsi > this.world.resistanceResource && fpsi < Infinity;
-                        const drawStop = stop ? 1 : 0;
-                        // const res = fpsi < Infinity ? 1 : 0;
-                        const res = Math.min(fpsi < Infinity ? fpsi / this.world.resistanceResource : 0, 1);
-                        const r = Math.max(drawStop, drawTpi);
-                        const g = res;
-                        const b = this.world.backgroundResistanceMap.normMap[i]; // this.world.voltageMap[x][y];
-                        imageData_1.setPixelNormI(this.imageData, i, r, g, b);
+                    const startV = this.world.voltageMap[this.world.start.y][this.world.start.x];
+                    for (let y = 0; y < this.world.height; y++) {
+                        const oy = y * this.world.width;
+                        const vz = this.world.voltageMap[y];
+                        const fz = this.world.floodMap[y];
+                        const rz = this.world.backgroundResistanceMap.normMap[y];
+                        for (let x = 0; x < this.world.width; x++) {
+                            const vzz = vz[x];
+                            const dv = vzz - startV;
+                            const tpi = 0; // this.world.travelPaths[i];
+                            const rtpi = 1 - tpi;
+                            const drawTpi = 1 - rtpi * rtpi * rtpi * rtpi;
+                            const fzz = fz[x];
+                            const stop = false;
+                            const drawStop = stop ? 1 : 0;
+                            // const res = fpsi < Infinity ? 1 : 0;
+                            const res = Math.min(fzz < Infinity
+                                ? (dv * dv / (fzz) * 20)
+                                : 0, 1);
+                            const r = Math.max(drawStop, drawTpi);
+                            const g = res;
+                            const b = 0; // rz[x]; // this.world.voltageMap[x][y];
+                            imageData_1.setPixelNormI(this.imageData, oy + x, r, g, b);
+                        }
                     }
                     // setPixelXY(this.imageData, 150, 150, 255, 255, 255);
                     this.ctx.putImageData(this.imageData, 0, 0);
-                    // const aLink = document.createElement("a");
-                    // aLink.download = `${this.world.t.toFixed(0)}.png`;
-                    // aLink.href = this.canvas.toDataURL();
-                    // aLink.innerText = `${this.world.t.toFixed(0)}.png`;
-                    // this.frameList.appendChild(aLink);
                 }
             };
             exports_8("Renderer", Renderer);
@@ -856,33 +976,58 @@ System.register("Controller", ["World", "Renderer"], function (exports_9, contex
         execute: function () {
             Controller = class Controller {
                 constructor() {
-                    this.world = new World_1.World(800, 900);
+                    this.world = new World_1.World(400, 400, { x: 150, y: 150 });
                     this.renderer = new Renderer_1.Renderer(this.world);
                 }
                 iteration() {
                     this.world.update();
                     this.renderer.render();
                 }
-                run() {
-                    setInterval(() => this.iteration(), 20);
-                }
             };
             exports_9("Controller", Controller);
         }
     };
 });
-System.register("main", ["Controller"], function (exports_10, context_10) {
+System.register("main", ["Controller", "gif.js"], function (exports_10, context_10) {
     var __moduleName = context_10 && context_10.id;
-    var Controller_1, controller;
+    var Controller_1, gif_js_1, controller, gif, gifStart, gifEnd, gifI;
     return {
         setters: [
             function (Controller_1_1) {
                 Controller_1 = Controller_1_1;
+            },
+            function (gif_js_1_1) {
+                gif_js_1 = gif_js_1_1;
             }
         ],
         execute: function () {
             controller = new Controller_1.Controller();
-            controller.run();
+            gif = new gif_js_1.default({
+                workerScript: "gif.worker.min.js",
+                width: controller.renderer.canvas.width,
+                height: controller.renderer.canvas.height,
+                workers: 4,
+                quality: 10,
+            });
+            gif.on("finished", (blob) => {
+                window.open(URL.createObjectURL(blob));
+            });
+            gifStart = 500;
+            gifEnd = -1;
+            gifI = 0;
+            setInterval(() => {
+                controller.iteration();
+                if (gifI >= gifStart && gifI < gifEnd) {
+                    gif.addFrame(controller.renderer.ctx, {
+                        copy: true,
+                        delay: 20,
+                    });
+                }
+                else if (gifI === gifEnd) {
+                    gif.render();
+                }
+                gifI++;
+            }, 20);
         }
     };
 });

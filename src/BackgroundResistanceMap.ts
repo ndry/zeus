@@ -30,23 +30,23 @@ class Noise {
 
             v += simplex.noise3D(x * gridScale, y * gridScale, t * gridScale) / valueScale;
         }
-        return v;
+        return 1; //v;
     }
 }
 
 export class BackgroundResistanceMap {
     random: Random;
 
-    size: number;
+    area: number;
 
     noise: Noise;
-    originalMap: Float64Array;
+    originalMap: Float64Array[];
     originalMapRange: {
         min: number,
         max: number,
     };
-    map: Float64Array;
-    normMap: Float64Array;
+    map: Float64Array[];
+    normMap: Float64Array[];
 
     constructor(
         public width: number,
@@ -54,12 +54,12 @@ export class BackgroundResistanceMap {
     ) {
         this.random = new Random(0);
 
-        this.size = width * height;
+        this.area = width * height;
         this.noise = new Noise();
-        this.originalMap = new Float64Array(this.size);
+        this.originalMap = Array.from({ length: height }, () => new Float64Array(width));
         this.fillMap(0);
-        this.map = new Float64Array(this.size);
-        this.normMap = new Float64Array(this.size);
+        this.map = Array.from({ length: height }, () => new Float64Array(width));
+        this.normMap = Array.from({ length: height }, () => new Float64Array(width));
     }
 
     fillMap(t: number) {
@@ -67,10 +67,9 @@ export class BackgroundResistanceMap {
         let max = Number.NEGATIVE_INFINITY;
 
         for (let y = 0; y < this.height; y++) {
-            const oy = y * this.width;
+            const originalMapY = this.originalMap[y];
             for (let x = 0; x < this.width; x++) {
-                const i = oy + x;
-                const v = this.originalMap[i] = this.noise.getValue(x, y, t);
+                const v = originalMapY[x] = this.noise.getValue(x, y, t);
                 if (v > max) { max = v; }
                 if (v < min) { min = v; }
             }
@@ -87,11 +86,12 @@ export class BackgroundResistanceMap {
         const range = this.originalMapRange.max + this.dynamicNoiseScale - this.originalMapRange.min;
 
         for (let y = 0; y < this.height; y++) {
-            const oy = y * this.width;
+            const originalMapY = this.originalMap[y];
+            const mapY = this.map[y];
+            const normMapY = this.normMap[y];
             for (let x = 0; x < this.width; x++) {
-                const i = oy + x;
-                const mapV = this.map[i] = this.originalMap[i] + this.random.nextFloat() * this.dynamicNoiseScale;
-                this.normMap[i] = (mapV - this.originalMapRange.min) / range;
+                const mapV = mapY[x] = originalMapY[x] + this.random.nextFloat() * this.dynamicNoiseScale;
+                normMapY[x] = 0.2 + (mapV - this.originalMapRange.min) / range * .8;
             }
         }
     }

@@ -9,26 +9,27 @@ export function generateVoltageMap(
         factor: 1 / 3,
     };
 
-    const map = new Float64Array(width * height);
+    const map = Array.from({ length: height }, () => new Float64Array(width));
 
     let min = Number.POSITIVE_INFINITY;
     let max = Number.NEGATIVE_INFINITY;
 
     for (let y = 0; y < height; y++) {
-        const oy = y * width;
+        const mapY = map[y];
         for (let x = 0; x < width; x++) {
-            const i = oy + x;
-
             let v = 0;
 
-            v += (y / height) * (y / height) * (y / height) * (y / height) * (y / height);
+            // v += (y / height);
 
-            const dx = x - sourceRadialGradientArgs.cx;
-            const dy = y - sourceRadialGradientArgs.cy;
-            const d = Math.sqrt(dx * dx + dy * dy);
-            v -= (1 - Math.pow(d / sourceRadialGradientArgs.r, 2)) * sourceRadialGradientArgs.factor;
+            {
+                const args = sourceRadialGradientArgs;
+                const dx = x - args.cx;
+                const dy = y - args.cy;
+                const r = Math.max(Math.sqrt(dx * dx + dy * dy), 1) / args.r;
+                v -= (1 / r) * args.factor;
+            }
 
-            map[i] = v;
+            mapY[x] = v;
             if (v > max) { max = v; }
             if (v < min) { min = v; }
         }
@@ -37,10 +38,9 @@ export function generateVoltageMap(
     const range = max - min;
 
     for (let y = 0; y < height; y++) {
-        const oy = y * width;
+        const mapY = map[y];
         for (let x = 0; x < width; x++) {
-            const i = oy + x;
-            map[i] = (map[i] - min) / range;
+            mapY[x] = (mapY[x] - min) / range;
         }
     }
 

@@ -30,34 +30,40 @@ export class Renderer {
         const fps = 1000 / (now - this.lastIteration);
         this.lastIteration = now;
         this.fpsLabel.innerText = `fps: ${fps.toFixed(2)}`;
+        const startV = this.world.voltageMap[this.world.start.y][this.world.start.x];
 
-        for (let i = 0; i < this.world.area; i++) {
-            const tpi = this.world.travelPaths[i];
-            const rtpi = 1 - tpi;
-            const drawTpi = 1 - rtpi * rtpi * rtpi * rtpi;
+        for (let y = 0; y < this.world.height; y++) {
+            const oy = y * this.world.width;
+            const vz = this.world.voltageMap[y];
+            const fz = this.world.floodMap[y];
+            const rz = this.world.backgroundResistanceMap.normMap[y];
+            for (let x = 0; x < this.world.width; x++) {
+                const vzz = vz[x];
+                const dv = vzz - startV;
 
-            const fpsi = this.world.floodPaths.sumMap[i];
-            const stop = fpsi > this.world.resistanceResource && fpsi < Infinity;
-            const drawStop = stop ? 1 : 0;
+                const tpi = 0; // this.world.travelPaths[i];
+                const rtpi = 1 - tpi;
+                const drawTpi = 1 - rtpi * rtpi * rtpi * rtpi;
 
-            // const res = fpsi < Infinity ? 1 : 0;
-            const res = Math.min(fpsi < Infinity ? fpsi / this.world.resistanceResource : 0, 1);
+                const fzz = fz[x];
+                const stop = false;
+                const drawStop = stop ? 1 : 0;
 
-            const r = Math.max(drawStop, drawTpi);
-            const g = res;
-            const b = this.world.backgroundResistanceMap.normMap[i]; // this.world.voltageMap[x][y];
+                // const res = fpsi < Infinity ? 1 : 0;
+                const res = Math.min(fzz < Infinity
+                    ? (dv * dv / (fzz) * 20)
+                    : 0,
+                1);
+                const r = Math.max(drawStop, drawTpi);
+                const g = res;
+                const b = 0; // rz[x]; // this.world.voltageMap[x][y];
 
-            setPixelNormI(this.imageData, i, r, g, b);
+                setPixelNormI(this.imageData, oy + x, r, g, b);
+            }
         }
 
         // setPixelXY(this.imageData, 150, 150, 255, 255, 255);
 
         this.ctx.putImageData(this.imageData, 0, 0);
-
-        // const aLink = document.createElement("a");
-        // aLink.download = `${this.world.t.toFixed(0)}.png`;
-        // aLink.href = this.canvas.toDataURL();
-        // aLink.innerText = `${this.world.t.toFixed(0)}.png`;
-        // this.frameList.appendChild(aLink);
     }
 }
