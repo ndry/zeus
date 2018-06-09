@@ -14,20 +14,34 @@ gif.on("finished", (blob: any) => {
     window.open(URL.createObjectURL(blob));
 });
 
-const gifStart = 500;
-const gifEnd = -1;
+const gifCreate = true;
+const gifStart = 0;
+const gifEnd = 300;
+const gifTakeEvery = 2;
+const stopRenderAfterGifEnd = true;
 
 let gifI = 0;
 setInterval(() => {
-    controller.iteration();
-
-    if (gifI >= gifStart && gifI < gifEnd) {
-        gif.addFrame(controller.renderer.ctx, {
-            copy: true,
-            delay: 20,
-        });
-    } else if (gifI === gifEnd) {
-        gif.render();
+    if (!gifCreate || !stopRenderAfterGifEnd || gifI < gifEnd) {
+        controller.iteration();
     }
-    gifI++;
+
+    if (gifCreate) {
+        if (gifI === gifStart) {
+            console.log("gif started");
+        }
+        if (gifI >= gifStart && gifI < gifEnd) {
+            if ((gifI - gifStart) % gifTakeEvery === 0) {
+                gif.addFrame(controller.renderer.ctx, {
+                    copy: true,
+                    delay: 40,
+                });
+            }
+        }
+        if (gifI === gifEnd) {
+            console.log("gif ended");
+            gif.render();
+        }
+        gifI++;
+    }
 }, 20);

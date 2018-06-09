@@ -30,7 +30,7 @@ class Noise {
 
             v += simplex.noise3D(x * gridScale, y * gridScale, t * gridScale) / valueScale;
         }
-        return 1; //v;
+        return v;
     }
 }
 
@@ -90,7 +90,7 @@ export class BackgroundResistanceMap {
             const mapY = this.map[y];
             const normMapY = this.normMap[y];
             for (let x = 0; x < this.width; x++) {
-                const mapV = mapY[x] = originalMapY[x] + this.random.nextFloat() * this.dynamicNoiseScale;
+                const mapV = mapY[x] = originalMapY[x]; // + this.random.nextFloat() * this.dynamicNoiseScale;
                 normMapY[x] = 0.2 + (mapV - this.originalMapRange.min) / range * .8;
             }
         }

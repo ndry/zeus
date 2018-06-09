@@ -5,8 +5,7 @@ export function generateVoltageMap(
     const sourceRadialGradientArgs = {
         cx: 150,
         cy: 150,
-        r: (height - 150),
-        factor: 1 / 3,
+        factor: 20,
     };
 
     const map = Array.from({ length: height }, () => new Float64Array(width));
@@ -25,7 +24,7 @@ export function generateVoltageMap(
                 const args = sourceRadialGradientArgs;
                 const dx = x - args.cx;
                 const dy = y - args.cy;
-                const r = Math.max(Math.sqrt(dx * dx + dy * dy), 1) / args.r;
+                const r = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
                 v -= (1 / r) * args.factor;
             }
 
@@ -36,13 +35,18 @@ export function generateVoltageMap(
     }
 
     const range = max - min;
+    const normMap = Array.from({ length: height }, () => new Float64Array(width));
 
     for (let y = 0; y < height; y++) {
         const mapY = map[y];
+        const normMapY = normMap[y];
         for (let x = 0; x < width; x++) {
-            mapY[x] = (mapY[x] - min) / range;
+            normMapY[x] = (mapY[x] - min) / range;
         }
     }
 
-    return map;
+    return {
+        map,
+        normMap,
+    };
 }
